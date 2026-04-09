@@ -6,7 +6,6 @@
 #include <cstdlib>
 
 #include "../matmul.h"
-#include "common.h"
 
 #ifdef QM_ARM
 #include <arm_neon.h>
@@ -18,10 +17,14 @@ namespace matmul {
 void MatmulOperator::mat_mul_simd_programming(struct matmul_params *params) {
     const struct matrix *A = &params->A, *B = &params->B, *C = &params->C;
     const int block_size = params->block_size;  // block_size = 32
+    assert(block_size == 32);
 
     quantize_fp32_to_int8(A->data_ptr, A->int8_data_ptr, params->A_scales, A->row * A->column, block_size);
 
     int m = C->row, n = C->column, k = A->column;
+#ifdef QM_x86
+    assert((k / block_size) % 2 == 0);
+#endif
     // A: m x k; B: n x k; C: m x n
     for (int row = 0; row < m; row++) {
         for (int col = 0; col < n; col++) {
@@ -118,12 +121,15 @@ void MatmulOperator::mat_mul_simd_programming(struct matmul_params *params) {
                 // (2) use `_mm256_and_si256` and lowMask to extract the lower half of wegihts
                 // (3) use `_mm256_srli_epi16` and `_mm256_and_si256` with lowMask to extract the upper half of weights
                 __m256i raw_w = _mm256_loadu_si256(w_start);
+                __m256i lower = _mm256_and_si256(raw_w, lowMask);
+                __m256i upper = _mm256_and_si256(_mm256_srli_epi16(raw_w, 4), lowMask);
 
                 // TODO: apply zero_point to weights and convert the range from (0, 15) to (-8, 7)
                 // Hint: using `_mm256_sub_epi8` to the lower-half and upper-half vectors of weights
                 // Note: Store the lower half and upper half of weights into `w_0` and `w_128`, respectively
                 const __m256i zero_point = _mm256_set1_epi8(8);
-                __m256i w_0, w_128;
+                __m256i w_0 = _mm256_sub_epi8(lower, zero_point);
+                __m256i w_128 = _mm256_sub_epi8(upper, zero_point);
 
                 // Perform int8 dot product with _mm256_maddubs_epi16
                 /* Syntax of _mm256_maddubs_epi16:
@@ -152,6 +158,8 @@ void MatmulOperator::mat_mul_simd_programming(struct matmul_params *params) {
                 // Hint: use `_mm256_maddubs_epi16` to complete the following computation
                 // dot = ax * sy
                 // dot2 = ax2 * sy2
+                dot = _mm256_maddubs_epi16(ax, sy);
+                dot2 = _mm256_maddubs_epi16(ax2, sy2);
 
                 // Convert int32 vectors to floating point vectors
                 const __m256i ones = _mm256_set1_epi16(1);

@@ -6,7 +6,6 @@
 #include <cstdlib>
 
 #include "../matmul.h"
-#include "common.h"
 
 namespace matmul {
 void MatmulOperator::mat_mul_reference(struct matmul_params *params) {

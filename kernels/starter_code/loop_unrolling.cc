@@ -6,7 +6,6 @@
 #include <cstdlib>
 
 #include "../matmul.h"
-#include "common.h"
 
 namespace matmul {
 void MatmulOperator::mat_mul_loop_unrolling(struct matmul_params *params) {
@@ -17,6 +16,10 @@ void MatmulOperator::mat_mul_loop_unrolling(struct matmul_params *params) {
     quantize_fp32_to_int8(A->data_ptr, A->int8_data_ptr, params->A_scales, A->row * A->column, block_size);
 
     int m = C->row, n = C->column, k = A->column;
+#ifdef QM_x86
+    assert((k / block_size) % 2 == 0);
+#endif
+    assert(n % 4 == 0);
     // A: m x k; B: n x k; C: m x n
     for (int row = 0; row < m; row++) {
         for (int col = 0; col < n; col += 4) {
@@ -87,9 +90,28 @@ void MatmulOperator::mat_mul_loop_unrolling(struct matmul_params *params) {
                 int intermediate_sum0_2nd = 0, intermediate_sum1_2nd = 0, intermediate_sum2_2nd = 0,
                     intermediate_sum3_2nd = 0;
                 for (int qj = 0; qj < 32; qj++) {
-                    // TODO: decode a packed byte into two int8 in the range of (-8, 7)
+                    uint8_t packed_int4_0 = w0_int4[qj];
+                    uint8_t packed_int4_1 = w1_int4[qj];
+                    uint8_t packed_int4_2 = w2_int4[qj];
+                    uint8_t packed_int4_3 = w3_int4[qj];
 
-                    // TODO: int8 multiply and accumulate operation
+                    signed char w0_de_0 = (packed_int4_0 & 0x0F) - 8;
+                    signed char w0_de_16 = (packed_int4_0 >> 4) - 8;
+                    signed char w1_de_0 = (packed_int4_1 & 0x0F) - 8;
+                    signed char w1_de_16 = (packed_int4_1 >> 4) - 8;
+                    signed char w2_de_0 = (packed_int4_2 & 0x0F) - 8;
+                    signed char w2_de_16 = (packed_int4_2 >> 4) - 8;
+                    signed char w3_de_0 = (packed_int4_3 & 0x0F) - 8;
+                    signed char w3_de_16 = (packed_int4_3 >> 4) - 8;
+
+                    intermediate_sum0 += a_int8[qj] * w0_de_0;
+                    intermediate_sum0_2nd += a_int8[qj + 32] * w0_de_16;
+                    intermediate_sum1 += a_int8[qj] * w1_de_0;
+                    intermediate_sum1_2nd += a_int8[qj + 32] * w1_de_16;
+                    intermediate_sum2 += a_int8[qj] * w2_de_0;
+                    intermediate_sum2_2nd += a_int8[qj + 32] * w2_de_16;
+                    intermediate_sum3 += a_int8[qj] * w3_de_0;
+                    intermediate_sum3_2nd += a_int8[qj + 32] * w3_de_16;
                 }
                 // dequantize the sum into floating point
                 acc0 += (float)intermediate_sum0 * s_a * s_w0;

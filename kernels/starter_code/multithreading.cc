@@ -6,7 +6,6 @@
 #include <cstdlib>
 
 #include "../matmul.h"
-#include "common.h"
 struct multithreading_thread_args {
     int start, end;
     const struct matmul_params* params;
@@ -18,6 +17,9 @@ static void* multithreading_worker_func(void* args) {
     const int block_size = params->block_size;
 
     int m = C->row, n = C->column, k = A->column;
+#ifdef QM_x86
+    assert((k / block_size) % 2 == 0);
+#endif
     // A: m x k; B: n x k; C: m x n
     for (int row = 0; row < m; row++) {
         for (int col = mat_args->start; col < mat_args->end; col++) {
@@ -109,8 +111,15 @@ void MatmulOperator::mat_mul_multithreading(struct matmul_params* params) {
     pthread_t thread_pool[num_thread];
     struct multithreading_thread_args threads_args[num_thread];
 
-    // TODO: Thread creation
+    for (int tid = 0; tid < num_thread; tid++) {
+        threads_args[tid].start = (tid * n) / num_thread;
+        threads_args[tid].end = ((tid + 1) * n) / num_thread;
+        threads_args[tid].params = params;
+        pthread_create(&thread_pool[tid], NULL, multithreading_worker_func, &threads_args[tid]);
+    }
 
-    // TODO: Join threads
+    for (int tid = 0; tid < num_thread; tid++) {
+        pthread_join(thread_pool[tid], NULL);
+    }
 };
 }  // namespace matmul
