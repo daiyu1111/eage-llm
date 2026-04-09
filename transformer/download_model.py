@@ -69,7 +69,7 @@ Qmodels = {
             "md5sum": "08c118ec34645808cd2d21678ad33659",
         },
         "LLaMA_7B_2_chat": {
-            "url": "https://huggingface.co/mit-han-lab/tinychatengine-model-zoo/resolve/main/QM_x86/LLaMA_7B_2_chat.zip?download=true",  # noqa: E501
+            "url": "https://hf-mirror.com/mit-han-lab/tinychatengine-model-zoo/resolve/main/QM_x86/LLaMA_7B_2_chat.zip?download=true", # noqa: E501
             "md5sum": "18f2193ccb393c7bca328f42427ef233",
         },
     },
