@@ -78,6 +78,7 @@ class MatmulOperator {
     void mat_mul_multithreading_loop_unrolling(struct matmul_params *params);
     void mat_mul_simd_programming(struct matmul_params *params);
     void mat_mul_all_techniques(struct matmul_params *params);
+    void mat_mul_all_techniques_4(struct matmul_params *params);
     // cuda
     void mat_mul_cuda(const struct matmul_params *params);
 

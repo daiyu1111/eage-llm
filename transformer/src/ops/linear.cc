@@ -193,6 +193,8 @@ void Linear_FP_int4::forward(const Matrix3D<float> &x, Matrix3D<float> &output) 
     op.mat_mul_multithreading_loop_unrolling(&params);
 #elif IMP == 5
     op.mat_mul_all_techniques(&params);
+#elif IMP == 6
+    op.mat_mul_all_techniques_4(&params);
 #else
     printf("Implementation not specified\n");
 #endif
